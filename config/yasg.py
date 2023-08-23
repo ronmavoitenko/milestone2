@@ -23,9 +23,6 @@ user_registration_operation = openapi.Operation(
 )
 
 urlpatterns = [
-    #path(r'^swagger(?P<format>\.json|\.yaml)$', schema_view.without_ui(cache_timeout=0), name='schema-json'),
     path('', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
     path('redoc/', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),
-    #path('register/', RegisterUserView.as_view(), name='user-registration'),
-    #path("login/", LoginUserView.as_view(), name="token_login"),
 ]

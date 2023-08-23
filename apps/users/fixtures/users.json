@@ -1,0 +1,27 @@
+[
+  {
+    "model": "auth.user",
+    "pk": 1,
+    "fields": {
+      "email": "user1@email.com",
+      "first_name": "first_name1",
+      "last_name": "last_name1",
+      "username": "user1@email.com",
+      "is_superuser": false,
+      "is_staff": false
+    }
+  },
+  {
+    "model": "auth.user",
+    "pk": 2,
+    "fields": {
+      "email": "user2@email.com",
+      "first_name": "first_name2",
+      "last_name": "last_name2",
+      "username": "user2@email.com",
+      "is_superuser": false,
+      "is_staff": false
+    }
+  }
+]
+

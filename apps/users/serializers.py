@@ -14,21 +14,6 @@ class UserSerializer(serializers.ModelSerializer):
             "password",
         )
 
-    def create_user(self, validated_data, password):
-        user = User.objects.create(
-            **validated_data,
-            username = validated_data['email'],
-        )
-        user.set_password(password)
-        user.save()
-        return user
-
-
-
-"""class LoginSerializer(serializers.Serializer):
-    email = serializers.EmailField()
-    password = serializers.CharField(write_only=True)"""
-
 
 class UserListSerializer(serializers.ModelSerializer):
     full_name = serializers.SerializerMethodField()
