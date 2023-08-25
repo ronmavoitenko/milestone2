@@ -38,7 +38,7 @@
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "WebServerToolWindowFactoryState": "false",
     "ignore.virus.scanning.warn.message": "true",
-    "last_opened_file_path": "D:/django/milestone2/milestone2",
+    "last_opened_file_path": "D:/django/ML2.1/milestone2",
     "node.js.detected.package.eslint": "true",
     "node.js.detected.package.tslint": "true",
     "node.js.selected.package.eslint": "(autodetect)",
@@ -58,7 +58,6 @@
       <option name="PARENT_ENVS" value="true" />
       <envs>
         <env name="PYTHONUNBUFFERED" value="1" />
-        <env name="DJANGO_SETTINGS_MODULE" value="milestone2.settings" />
       </envs>
       <option name="SDK_HOME" value="" />
       <option name="WORKING_DIRECTORY" value="" />
@@ -92,6 +91,7 @@
       <workItem from="1692799868105" duration="18000" />
       <workItem from="1692859060054" duration="1605000" />
       <workItem from="1692863852490" duration="1998000" />
+      <workItem from="1692959865367" duration="517000" />
     </task>
     <task id="LOCAL-00001" summary="qwe">
       <option name="closed" value="true" />

@@ -1,9 +1,10 @@
+from django.contrib.auth.models import User
 from django.db.models import Sum
 from rest_framework import serializers
 from .models import Task, Comment, TimeLog
 
 
-class SerializerTask(serializers.ModelSerializer):
+class TaskSerializer(serializers.ModelSerializer):
     class Meta:
         model = Task
         fields = ("title", "description")
@@ -16,42 +17,34 @@ class SerializerTask(serializers.ModelSerializer):
 
 
 class TaskListSerializer(serializers.ModelSerializer):
-    total_time_minutes = serializers.SerializerMethodField()
+    total_duration = serializers.SerializerMethodField()
 
-    def get_total_time_minutes(self, task):
-        total_time = task.timelog_set.aggregate(total=Sum('duration')).get('total')
+    def get_total_duration(self, task):
+        total_time = task.timelogs.aggregate(total=Sum('duration')).get('total')
         return total_time or 0
 
     class Meta:
         model = Task
-        fields = ("id", "title", "total_time_minutes")
+        fields = ("id", "title", "total_duration")
 
 
-class AssignTask(serializers.ModelSerializer):
-    user_id = serializers.IntegerField()
-
-    class Meta:
-        model = Task
-        fields = ('user_id',)
+class TaskAssignSerializer(serializers.Serializer):
+    user = serializers.PrimaryKeyRelatedField(queryset=User.objects.all())
 
 
-class TaskDetailsByIdSerializer(serializers.ModelSerializer):
+class ShortTaskSerializer(serializers.ModelSerializer):
     class Meta:
         model = Task
         fields = ("id", "title", "description", "status", "owner")
 
 
 class CreateCommentSerializer(serializers.ModelSerializer):
-    task_id = serializers.IntegerField()
-
     class Meta:
         model = Comment
-        fields = ("task_id", "text")
+        fields = ("task", "text")
 
 
 class AllCommentSerializer(serializers.ModelSerializer):
-    task = serializers.CharField()
-
     class Meta:
         model = Comment
         fields = ("id", "task", "user", "text")
