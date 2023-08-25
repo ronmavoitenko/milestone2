@@ -23,7 +23,7 @@ class Command(BaseCommand):
                 owner=task_owner,
                 user=task_user
             )
-            for j in range(2): #random.randint(1, 2)):
+            for j in range(2):
                 start_time = timezone.now() - timezone.timedelta(days=random.randint(0, 30))
                 end_time = start_time + timezone.timedelta(hours=random.randint(1, 10))
                 TimeLog.objects.create(

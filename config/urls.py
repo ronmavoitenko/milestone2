@@ -16,13 +16,7 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path
 from .yasg import urlpatterns as doc_urls
-from apps.users.urls import urlpatterns as usr_urls
-from apps.tasks.urls import urlpatterns as task_urls
 
 urlpatterns = [
     path('admin/', admin.site.urls),
 ]
-
-urlpatterns += doc_urls
-urlpatterns += usr_urls
-urlpatterns +=task_urls
