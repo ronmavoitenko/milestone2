@@ -15,7 +15,6 @@ schema_view = get_schema_view(
 )
 
 
-def send_notification(task, subject, message):
+def send_notification(recipients, subject, message):
     from_email = settings.EMAIL_HOST_USER
-    recipient_list = [task.owner.email]
-    send_mail(subject, message, from_email, recipient_list, fail_silently=True)
+    send_mail(subject, message, from_email, recipients, fail_silently=True)
