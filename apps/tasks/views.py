@@ -1,3 +1,5 @@
+from django.utils import timezone
+from drf_yasg.utils import swagger_auto_schema, no_body
 from rest_framework import filters
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
@@ -7,7 +9,7 @@ from rest_framework.response import Response
 from apps.common.helpers import send_notification
 from apps.tasks.models import Task, Comment, TimeLog
 from apps.tasks.serializers import TaskSerializer, TaskListSerializer, ShortTaskSerializer, \
-    CreateCommentSerializer, AllCommentSerializer, TimeLogSerializer, TaskAssignSerializer
+    CreateCommentSerializer, AllCommentSerializer, TimeLogSerializer, CreateTimeLogSerializer, TaskAssignSerializer
 
 
 class TaskViewSet(viewsets.ModelViewSet):
@@ -47,6 +49,7 @@ class TaskViewSet(viewsets.ModelViewSet):
     def completed(self, request, *args, **kwargs):
         return super().list(request, *args, **kwargs)
 
+    @swagger_auto_schema(request_body=no_body)
     @action(methods=['patch'], detail=True, url_path="complete")
     def complete(self, request, *args, **kwargs):
         task = self.get_object()
@@ -65,7 +68,15 @@ class TaskViewSet(viewsets.ModelViewSet):
         user = serializer.validated_data["user"]
         task.owner = user
         task.save()
+        subject = "New task!"
+        message = "New task was assigned to You"
+        send_notification(task, subject, message)
         return Response({"success": True, 'message': f'Task {task.title} assigned to user {user.get_full_name()}'})
+
+    @action(methods=['get'], detail=True, serializer_class=AllCommentSerializer, url_path="comments",
+            queryset=Comment.objects.all(), search_fields=None)
+    def comments(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
 
 
 class CommentViewSet(viewsets.ModelViewSet):
@@ -73,7 +84,6 @@ class CommentViewSet(viewsets.ModelViewSet):
     queryset = Comment.objects.all()
     serializer_class = AllCommentSerializer
     filter_backends = [filters.SearchFilter]
-    search_fields = ["task__id"]
 
     def get_serializer_class(self):
         if self.action == "create":
@@ -82,3 +92,44 @@ class CommentViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
+        task_id = self.request.data['task']
+        task = Task.objects.get(pk=task_id)
+        if task.status == Task.Status.DONE and task.owner == self.request.user:
+            subject = "New comment to completed task!"
+        elif task.owner == self.request.user:
+            subject = "New comment!"
+        message = "You task was commented"
+        send_notification(task, subject, message)
+
+
+class TimerViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated]
+    queryset = TimeLog.objects.all()
+    serializer_class = TimeLogSerializer
+
+    def get_serializer_class(self):
+        if self.action == "create":
+            return CreateTimeLogSerializer
+        return super().get_serializer_class()
+
+    def perform_create(self, serializer):
+        task_id = self.request.data['task']
+        task = Task.objects.get(pk=task_id)
+        try:
+            TimeLog.objects.get(task=task, end_time__isnull=True)
+            return Response({"error": "A timer is already running for this task"}, status=status.HTTP_400_BAD_REQUEST)
+        except TimeLog.DoesNotExist:
+            pass
+
+        TimeLog.objects.create(task=task, start_time=timezone.now())
+        task.status = Task.Status.IN_PROGRESS
+        task.save()
+
+    @swagger_auto_schema(request_body=no_body)
+    @action(methods=['post'], detail=True, url_path="stop")
+    def stop(self, request, pk=None):
+        task = Task.objects.get(pk=pk)
+        time_log = TimeLog.objects.get(task=task, end_time__isnull=True)
+        time_log.end_time = timezone.now()
+        time_log.duration = (time_log.end_time - time_log.start_time).seconds // 60
+        time_log.save()
