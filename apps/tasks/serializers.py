@@ -43,17 +43,3 @@ class AllCommentSerializer(serializers.ModelSerializer):
         model = Comment
         fields = ("id", "task", "user", "text")
 
-
-class TimeLogSerializer(serializers.ModelSerializer):
-    start_time = serializers.DateTimeField(format="%Y-%m-%d %H:%M")
-    end_time = serializers.DateTimeField(format="%Y-%m-%d %H:%M", allow_null=True)
-
-    class Meta:
-        model = TimeLog
-        fields = ("task", "start_time", "end_time", "duration")
-
-
-class CreateTimeLogSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = TimeLog
-        fields = ("task",)
