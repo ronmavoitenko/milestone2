@@ -100,36 +100,3 @@ class CommentViewSet(viewsets.ModelViewSet):
             subject = "New comment!"
         message = "You task was commented"
         send_notification(task, subject, message)
-
-
-class TimerViewSet(viewsets.ModelViewSet):
-    permission_classes = [IsAuthenticated]
-    queryset = TimeLog.objects.all()
-    serializer_class = TimeLogSerializer
-
-    def get_serializer_class(self):
-        if self.action == "create":
-            return CreateTimeLogSerializer
-        return super().get_serializer_class()
-
-    def perform_create(self, serializer):
-        task_id = self.request.data['task']
-        task = Task.objects.get(pk=task_id)
-        try:
-            TimeLog.objects.get(task=task, end_time__isnull=True)
-            return Response({"error": "A timer is already running for this task"}, status=status.HTTP_400_BAD_REQUEST)
-        except TimeLog.DoesNotExist:
-            pass
-
-        TimeLog.objects.create(task=task, start_time=timezone.now())
-        task.status = Task.Status.IN_PROGRESS
-        task.save()
-
-    @swagger_auto_schema(request_body=no_body)
-    @action(methods=['post'], detail=True, url_path="stop")
-    def stop(self, request, pk=None):
-        task = Task.objects.get(pk=pk)
-        time_log = TimeLog.objects.get(task=task, end_time__isnull=True)
-        time_log.end_time = timezone.now()
-        time_log.duration = (time_log.end_time - time_log.start_time).seconds // 60
-        time_log.save()
