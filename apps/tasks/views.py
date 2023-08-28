@@ -8,9 +8,9 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from apps.common.helpers import send_notification
-from apps.tasks.models import Task, Comment
+from apps.tasks.models import Task, Comment, TimeLog
 from apps.tasks.serializers import TaskSerializer, TaskListSerializer, ShortTaskSerializer, \
-    CreateCommentSerializer, AllCommentSerializer, TaskAssignSerializer
+    CreateCommentSerializer, AllCommentSerializer, TaskAssignSerializer, CreateTimeLogSerializer, TimeLogSerializer
 
 
 class TaskViewSet(viewsets.ModelViewSet):
@@ -27,6 +27,8 @@ class TaskViewSet(viewsets.ModelViewSet):
             return TaskSerializer
         if self.action == "comments":
             return AllCommentSerializer
+        if self.action == "list":
+            return TaskListSerializer
 
         return super().get_serializer_class()
 
@@ -88,7 +90,6 @@ class CommentViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     queryset = Comment.objects.all()
     serializer_class = AllCommentSerializer
-    filter_backends = [filters.SearchFilter]
 
     def get_serializer_class(self):
         if self.action == "create":
@@ -100,3 +101,65 @@ class CommentViewSet(viewsets.ModelViewSet):
         task_id = self.request.data['task']
         task = get_object_or_404(Task, id=task_id)
         send_notification([task.owner.email], "New comment!", "You task was commented")
+
+
+class TimerViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated]
+    queryset = TimeLog.objects.all()
+    serializer_class = CreateTimeLogSerializer
+
+    def get_serializer_class(self):
+        if self.action == "perform_create":
+            return CreateTimeLogSerializer
+        if self.action == "add_time_log_manually":
+            return TimeLogSerializer
+        if self.action == "time_logs_by_id":
+            return TimeLogSerializer
+        return super().get_serializer_class()
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        if self.action == "time_logs_by_id":
+            queryset = queryset.filter(task=self.kwargs.get("pk"))
+
+        return queryset
+
+    def perform_create(self, serializer):
+        task_id = self.request.data['task']
+        task = Task.objects.get(pk=task_id)
+        try:
+            TimeLog.objects.get(task=task, end_time__isnull=True)
+            return Response({"error": "A timer is already running for this task"}, status=status.HTTP_400_BAD_REQUEST)
+        except TimeLog.DoesNotExist:
+            pass
+        TimeLog.objects.create(task=task, start_time=timezone.now())
+        task.status = Task.Status.IN_PROGRESS
+        task.save()
+
+    @action(methods=['get'], detail=True, serializer_class=CreateTimeLogSerializer, url_path="by-id",
+            queryset=TimeLog.objects.all())
+    def time_logs_by_id(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
+
+    @swagger_auto_schema(request_body=no_body)
+    @action(methods=['post'], detail=True, url_path="stop")
+    def stop(self, request, pk=None):
+        task = Task.objects.get(pk=pk)
+        time_log = TimeLog.objects.get(task=task, end_time__isnull=True)
+        time_log.end_time = timezone.now()
+        time_log.duration = (time_log.end_time - time_log.start_time).seconds // 60
+        time_log.save()
+        return Response({"message": f"You worked on this task {time_log.duration} minutes"})
+
+    @action(methods=['post'], detail=False, url_path="manually")
+    def add_time_log_manually(self, request):
+        serializer = TimeLogSerializer(data=request.data)
+        if serializer.is_valid():
+            task_id = serializer.validated_data['task']
+            if TimeLog.objects.filter(task=task_id, end_time__isnull=True).exists():
+                return Response({"error": "A timer is already running for this task"},
+                                status=status.HTTP_400_BAD_REQUEST)
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        else:
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
