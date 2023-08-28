@@ -1,7 +1,7 @@
 from django.contrib.auth.models import User
 from django.db.models import Sum
 from rest_framework import serializers
-from .models import Task, Comment
+from apps.tasks.models import Task, Comment
 
 
 class TaskSerializer(serializers.ModelSerializer):
@@ -11,7 +11,6 @@ class TaskSerializer(serializers.ModelSerializer):
 
 
 class TaskListSerializer(serializers.ModelSerializer):
-    total_duration = serializers.SerializerMethodField()
 
     class Meta:
         model = Task
