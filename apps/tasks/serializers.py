@@ -1,7 +1,7 @@
 from django.contrib.auth.models import User
 from django.db.models import Sum
 from rest_framework import serializers
-from .models import Task, Comment, TimeLog
+from .models import Task, Comment
 
 
 class TaskSerializer(serializers.ModelSerializer):
@@ -13,13 +13,9 @@ class TaskSerializer(serializers.ModelSerializer):
 class TaskListSerializer(serializers.ModelSerializer):
     total_duration = serializers.SerializerMethodField()
 
-    def get_total_duration(self, task):
-        total_time = task.timelogs.aggregate(total=Sum('duration')).get('total')
-        return total_time or 0
-
     class Meta:
         model = Task
-        fields = ("id", "title", "total_duration")
+        fields = ("id", "title")
 
 
 class TaskAssignSerializer(serializers.Serializer):
@@ -42,4 +38,3 @@ class AllCommentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Comment
         fields = ("id", "task", "user", "text")
-

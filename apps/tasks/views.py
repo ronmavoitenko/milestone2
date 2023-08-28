@@ -8,9 +8,9 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from apps.common.helpers import send_notification
-from apps.tasks.models import Task, Comment, TimeLog
+from apps.tasks.models import Task, Comment
 from apps.tasks.serializers import TaskSerializer, TaskListSerializer, ShortTaskSerializer, \
-    CreateCommentSerializer, AllCommentSerializer, TimeLogSerializer, CreateTimeLogSerializer, TaskAssignSerializer
+    CreateCommentSerializer, AllCommentSerializer, TaskAssignSerializer
 
 
 class TaskViewSet(viewsets.ModelViewSet):

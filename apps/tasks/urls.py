@@ -1,6 +1,6 @@
 from django.urls import path
 from rest_framework.routers import DefaultRouter
-from .views import TaskViewSet, CommentViewSet, TimerViewSet
+from .views import TaskViewSet, CommentViewSet
 
 router = DefaultRouter(trailing_slash=False)
 router.register(r'tasks', TaskViewSet, basename='task'),
