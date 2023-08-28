@@ -1,3 +1,4 @@
+from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from drf_yasg.utils import swagger_auto_schema, no_body
 from rest_framework import filters
@@ -24,6 +25,9 @@ class TaskViewSet(viewsets.ModelViewSet):
             return ShortTaskSerializer
         if self.action == "create":
             return TaskSerializer
+        if self.action == "comments":
+            return AllCommentSerializer
+
         return super().get_serializer_class()
 
     def get_queryset(self):
@@ -34,6 +38,8 @@ class TaskViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(owner=self.request.user)
         if self.action == "completed":
             queryset = queryset.filter(status=Task.Status.DONE)
+        if self.action == "comments":
+            queryset = queryset.filter(task=self.kwargs.get("pk"))
 
         return queryset
 
@@ -55,6 +61,9 @@ class TaskViewSet(viewsets.ModelViewSet):
         task = self.get_object()
         task.status = Task.Status.DONE
         task.save()
+        subject = "New commented task was complete!"
+        message = "New task was assigned to You"
+        send_notification(task, subject, message)
         return Response({"success": True}, status=status.HTTP_200_OK)
 
     def perform_create(self, serializer):
@@ -93,10 +102,9 @@ class CommentViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
         task_id = self.request.data['task']
-        task = Task.objects.get(pk=task_id)
-        if task.status == Task.Status.DONE and task.owner == self.request.user:
-            subject = "New comment to completed task!"
-        elif task.owner == self.request.user:
+        task = get_object_or_404(Task, id=task_id)
+        if task.owner == self.request.user:
             subject = "New comment!"
         message = "You task was commented"
         send_notification(task, subject, message)
+

@@ -9,12 +9,6 @@ class TaskSerializer(serializers.ModelSerializer):
         model = Task
         fields = ("title", "description")
 
-    def create(self, validated_data):
-        task = Task.objects.create(**validated_data)
-        task.user = self.context['request'].user
-        task.owner = self.context['request'].user
-        return task
-
 
 class TaskListSerializer(serializers.ModelSerializer):
     total_duration = serializers.SerializerMethodField()
