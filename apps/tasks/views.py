@@ -6,7 +6,6 @@ from drf_yasg.utils import swagger_auto_schema, no_body
 from rest_framework import filters
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from apps.common.helpers import send_notification
@@ -29,8 +28,10 @@ class TaskViewSet(viewsets.ModelViewSet):
             return TaskSerializer
         if self.action == "comments":
             return AllCommentSerializer
-        if self.action == "list":
+        if self.action in ["list", "get_top_20_tasks_last_month"]:
             return TaskListSerializer
+        if self.action == "assign":
+            return TaskAssignSerializer
 
         return super().get_serializer_class()
 
@@ -45,9 +46,8 @@ class TaskViewSet(viewsets.ModelViewSet):
         if self.action == "comments":
             queryset = queryset.filter(task=self.kwargs.get("pk"))
         if self.action == "list":
-            total_duration_subquery = TimeLog.objects.filter(task=OuterRef('id')).values('task').annotate(
-                total=Sum('duration')).values('total')
-            queryset = queryset.annotate(total_duration=Subquery(total_duration_subquery))
+            queryset = queryset.annotate(total_duration=Subquery(TimeLog.objects.filter(task=OuterRef('id')).values(
+                'task').annotate(total=Sum('duration')).values('total')))
         if self.action == "get_top_20_tasks_last_month":
             queryset = Task.objects.filter(
                 owner=self.request.user,
@@ -84,7 +84,7 @@ class TaskViewSet(viewsets.ModelViewSet):
     @action(methods=['post'], detail=True, serializer_class=TaskAssignSerializer, url_path="assign")
     def assign(self, request, *args, **kwargs):
         task = self.get_object()
-        serializer = TaskAssignSerializer(data=request.data)
+        serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = serializer.validated_data["user"]
         task.owner = user
@@ -97,10 +97,10 @@ class TaskViewSet(viewsets.ModelViewSet):
     def comments(self, request, *args, **kwargs):
         return super().list(request, *args, **kwargs)
 
-    @action(methods=['get'], detail=False, serializer_class=TaskListSerializer, url_path="top-20-tasks")
+    @action(methods=['get'], detail=False, url_path="top-20-tasks")
     def get_top_20_tasks_last_month(self, request):
         top_tasks = self.get_queryset()
-        serializer = TaskListSerializer(top_tasks, many=True).data
+        serializer = self.get_serializer(top_tasks, many=True).data
         return Response(serializer, status=status.HTTP_200_OK)
 
 
@@ -127,6 +127,8 @@ class TimerViewSet(viewsets.ModelViewSet):
     def get_serializer_class(self):
         if self.action in ["add_time_log_manually", "time_logs_by_id"]:
             return TimeLogSerializer
+        if self.action == "stop":
+            return StopTimeLogSerializer
         return super().get_serializer_class()
 
     def get_queryset(self):
@@ -144,9 +146,9 @@ class TimerViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         task = serializer.validated_data['task']
-        TimeLog.objects.create(task=task, start_time=timezone.now())
         task.status = Task.Status.IN_PROGRESS
         task.save()
+        serializer.save()
 
     @action(methods=['get'], detail=True, url_path="by-id")
     def time_logs_by_id(self, request, *args, **kwargs):
@@ -154,7 +156,7 @@ class TimerViewSet(viewsets.ModelViewSet):
 
     @action(methods=['post'], detail=False, url_path="stop")
     def stop(self, request):
-        serializer = StopTimeLogSerializer(data=self.request.data)
+        serializer = self.get_serializer(data=self.request.data)
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response({"Timer was stopped successfully"})
