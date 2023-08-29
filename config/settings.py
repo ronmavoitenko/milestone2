@@ -55,7 +55,6 @@ INSTALLED_APPS = [
 ]
 
 REST_FRAMEWORK = {
-    # ...
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
@@ -90,7 +89,7 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-ROOT_URLCONF = 'milestone2.urls'
+ROOT_URLCONF = 'config.urls'
 
 AUTHENTICATION_BACKENDS = (
     "django.contrib.auth.backends.ModelBackend",
