@@ -1,5 +1,5 @@
 from dateutil.relativedelta import relativedelta
-from django.db.models import Sum
+from django.db.models import Sum, Subquery, OuterRef
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from drf_yasg.utils import swagger_auto_schema, no_body
@@ -12,11 +12,11 @@ from rest_framework.response import Response
 from apps.common.helpers import send_notification
 from apps.tasks.models import Task, Comment, TimeLog
 from apps.tasks.serializers import TaskSerializer, TaskListSerializer, ShortTaskSerializer, \
-    CreateCommentSerializer, AllCommentSerializer, TaskAssignSerializer, CreateTimeLogSerializer, TimeLogSerializer, Top20Tasks
+    CreateCommentSerializer, AllCommentSerializer, TaskAssignSerializer, CreateTimeLogSerializer,\
+    TimeLogSerializer, StopTimeLogSerializer
 
 
 class TaskViewSet(viewsets.ModelViewSet):
-    permission_classes = [IsAuthenticated]
     queryset = Task.objects.all()
     serializer_class = TaskSerializer
     filter_backends = [filters.SearchFilter]
@@ -44,6 +44,16 @@ class TaskViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(status=Task.Status.DONE)
         if self.action == "comments":
             queryset = queryset.filter(task=self.kwargs.get("pk"))
+        if self.action == "list":
+            total_duration_subquery = TimeLog.objects.filter(task=OuterRef('id')).values('task').annotate(
+                total=Sum('duration')).values('total')
+            queryset = queryset.annotate(total_duration=Subquery(total_duration_subquery))
+        if self.action == "get_top_20_tasks_last_month":
+            queryset = Task.objects.filter(
+                owner=self.request.user,
+                timelogs__start_time__gte=timezone.now() - relativedelta(months=1),
+                timelogs__start_time__lte=timezone.now(),
+            ).annotate(total_duration=Sum('timelogs__duration')).order_by('-total_duration')[:20]
 
         return queryset
 
@@ -89,17 +99,12 @@ class TaskViewSet(viewsets.ModelViewSet):
 
     @action(methods=['get'], detail=False, serializer_class=TaskListSerializer, url_path="top-20-tasks")
     def get_top_20_tasks_last_month(self, request):
-        top_tasks = Task.objects.filter(
-            owner=request.user,
-            timelogs__start_time__gte=timezone.now() - relativedelta(months=1),
-            timelogs__start_time__lte=timezone.now(),
-        ).annotate(duration=Sum('timelogs__duration')).order_by('-duration')[:20]
+        top_tasks = self.get_queryset()
         serializer = TaskListSerializer(top_tasks, many=True).data
         return Response(serializer, status=status.HTTP_200_OK)
 
 
 class CommentViewSet(viewsets.ModelViewSet):
-    permission_classes = [IsAuthenticated]
     queryset = Comment.objects.all()
     serializer_class = AllCommentSerializer
 
@@ -116,16 +121,11 @@ class CommentViewSet(viewsets.ModelViewSet):
 
 
 class TimerViewSet(viewsets.ModelViewSet):
-    permission_classes = [IsAuthenticated]
     queryset = TimeLog.objects.all()
     serializer_class = CreateTimeLogSerializer
 
     def get_serializer_class(self):
-        if self.action == "perform_create":
-            return CreateTimeLogSerializer
-        if self.action == "add_time_log_manually":
-            return TimeLogSerializer
-        if self.action == "time_logs_by_id":
+        if self.action in ["add_time_log_manually", "time_logs_by_id"]:
             return TimeLogSerializer
         return super().get_serializer_class()
 
@@ -133,54 +133,40 @@ class TimerViewSet(viewsets.ModelViewSet):
         queryset = super().get_queryset()
         if self.action == "time_logs_by_id":
             queryset = queryset.filter(task=self.kwargs.get("pk"))
+        if self.action == "get_time_logged_last_month":
+            queryset = TimeLog.objects.filter(
+                task__owner=self.request.user,
+                start_time__gte=timezone.now() - relativedelta(months=1),
+                start_time__lte=timezone.now(),
+            ).aggregate(total=Sum('duration')).get('total')
 
         return queryset
 
     def perform_create(self, serializer):
-        task_id = self.request.data['task']
-        task = Task.objects.get(pk=task_id)
-        try:
-            TimeLog.objects.get(task=task, end_time__isnull=True)
-            return Response({"error": "A timer is already running for this task"}, status=status.HTTP_400_BAD_REQUEST)
-        except TimeLog.DoesNotExist:
-            pass
+        task = serializer.validated_data['task']
         TimeLog.objects.create(task=task, start_time=timezone.now())
         task.status = Task.Status.IN_PROGRESS
         task.save()
 
-    @action(methods=['get'], detail=True, serializer_class=CreateTimeLogSerializer, url_path="by-id",
-            queryset=TimeLog.objects.all())
+    @action(methods=['get'], detail=True, url_path="by-id")
     def time_logs_by_id(self, request, *args, **kwargs):
         return super().list(request, *args, **kwargs)
 
-    @swagger_auto_schema(request_body=no_body)
-    @action(methods=['post'], detail=True, url_path="stop")
-    def stop(self, request, pk=None):
-        task = Task.objects.get(pk=pk)
-        time_log = TimeLog.objects.get(task=task, end_time__isnull=True)
-        time_log.end_time = timezone.now()
-        time_log.duration = (time_log.end_time - time_log.start_time).seconds // 60
-        time_log.save()
-        return Response({"message": f"You worked on this task {time_log.duration} minutes"})
+    @action(methods=['post'], detail=False, url_path="stop")
+    def stop(self, request):
+        serializer = StopTimeLogSerializer(data=self.request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response({"Timer was stopped successfully"})
 
     @action(methods=['post'], detail=False, url_path="manually")
     def add_time_log_manually(self, request):
-        serializer = TimeLogSerializer(data=request.data)
-        if serializer.is_valid():
-            task_id = serializer.validated_data['task']
-            if TimeLog.objects.filter(task=task_id, end_time__isnull=True).exists():
-                return Response({"error": "A timer is already running for this task"},
-                                status=status.HTTP_400_BAD_REQUEST)
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        else:
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     @action(methods=['get'], detail=False, serializer_class=None, url_path="time-logged-last-month")
     def get_time_logged_last_month(self, request):
-        total_time_logged = TimeLog.objects.filter(
-                 task__owner=request.user,
-                 start_time__gte=timezone.now() - relativedelta(months=1),
-                 start_time__lte=timezone.now(),
-             ).aggregate(total=Sum('duration')).get('total')
+        total_time_logged = self.get_queryset()
         return Response({"Total time logged last month in minutes": total_time_logged or 0})

@@ -1,5 +1,5 @@
 from django.contrib.auth.models import User
-from django.db.models import Sum
+from django.utils import timezone
 from rest_framework import serializers
 from apps.tasks.models import Task, Comment, TimeLog
 
@@ -11,15 +11,11 @@ class TaskSerializer(serializers.ModelSerializer):
 
 
 class TaskListSerializer(serializers.ModelSerializer):
-    total_duration = serializers.SerializerMethodField()
-
-    def get_total_duration(self, task):
-        total_time = task.timelogs.aggregate(total=Sum('duration')).get('total')
-        return total_time or 0
+    total_duration = serializers.IntegerField()
 
     class Meta:
         model = Task
-        fields = ("id", "title", "total_duration")
+        exclude = ("user", "status", "owner")
 
 
 class TaskAssignSerializer(serializers.Serializer):
@@ -54,12 +50,34 @@ class TimeLogSerializer(serializers.ModelSerializer):
 
 
 class CreateTimeLogSerializer(serializers.ModelSerializer):
+    task = serializers.PrimaryKeyRelatedField(queryset=Task.objects.all())
+
     class Meta:
         model = TimeLog
         fields = ("task",)
 
+    def validate_task(self, value):
+        if TimeLog.objects.filter(task=value, end_time__isnull=True).exists():
+            raise serializers.ValidationError("A timer is already running for this task")
+        return value
 
-class Top20Tasks(serializers.ModelSerializer):
+
+class StopTimeLogSerializer(serializers.ModelSerializer):
+    task = serializers.PrimaryKeyRelatedField(queryset=Task.objects.all())
+
     class Meta:
         model = TimeLog
-        fields = ("id", "title", "duration")
+        fields = ("task",)
+
+    def validate_task(self, value):
+        active_timer = TimeLog.objects.filter(task=value, end_time__isnull=True)
+        if not active_timer.exists():
+            raise serializers.ValidationError("No running timer found for this task")
+        return value
+
+    def save(self, **kwargs):
+        task = self.validated_data['task']
+        time_log = TimeLog.objects.get(task=task, end_time__isnull=True)
+        time_log.end_time = timezone.now()
+        time_log.duration = (time_log.end_time - time_log.start_time).seconds // 60
+        time_log.save()
