@@ -1,3 +1,5 @@
+from dateutil.relativedelta import relativedelta
+from django.db.models import Sum
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from drf_yasg.utils import swagger_auto_schema, no_body
@@ -163,3 +165,29 @@ class TimerViewSet(viewsets.ModelViewSet):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         else:
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=['get'], detail=False, serializer_class=None, url_path="time-logged-last-month")
+    def get_time_logged_last_month(self, request):
+        total_time_logged = TimeLog.objects.filter(
+                 task__owner=request.user,
+                 start_time__gte=timezone.now() - relativedelta(months=1),
+                 start_time__lte=timezone.now(),
+             ).aggregate(total=Sum('duration')).get('total')
+        return Response({"Total time logged last month in minutes": total_time_logged or 0})
+
+    @action(methods=['get'], detail=False, serializer_class=None, url_path="top-20-tasks")
+    def get_top_20_tasks_last_month(self, request):
+        top_tasks = Task.objects.filter(
+                 owner=request.user,
+                 timelogs__start_time__gte=timezone.now() - relativedelta(months=1),
+                 timelogs__start_time__lte=timezone.now(),
+             ).annotate(duration=Sum('timelogs__duration')).order_by('-duration')[:20]
+        serializes_tasks = [
+                {
+                    "id": task.id,
+                    "title": task.title,
+                    "duration": task.duration or 0
+                }
+                for task in top_tasks
+            ]
+        return Response(serializes_tasks, status=status.HTTP_200_OK)
