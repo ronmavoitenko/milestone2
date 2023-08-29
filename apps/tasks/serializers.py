@@ -57,3 +57,9 @@ class CreateTimeLogSerializer(serializers.ModelSerializer):
     class Meta:
         model = TimeLog
         fields = ("task",)
+
+
+class Top20Tasks(serializers.ModelSerializer):
+    class Meta:
+        model = TimeLog
+        fields = ("id", "title", "duration")

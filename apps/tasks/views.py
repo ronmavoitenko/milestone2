@@ -12,7 +12,7 @@ from rest_framework.response import Response
 from apps.common.helpers import send_notification
 from apps.tasks.models import Task, Comment, TimeLog
 from apps.tasks.serializers import TaskSerializer, TaskListSerializer, ShortTaskSerializer, \
-    CreateCommentSerializer, AllCommentSerializer, TaskAssignSerializer, CreateTimeLogSerializer, TimeLogSerializer
+    CreateCommentSerializer, AllCommentSerializer, TaskAssignSerializer, CreateTimeLogSerializer, TimeLogSerializer, Top20Tasks
 
 
 class TaskViewSet(viewsets.ModelViewSet):
@@ -86,6 +86,16 @@ class TaskViewSet(viewsets.ModelViewSet):
             queryset=Comment.objects.all(), search_fields=None)
     def comments(self, request, *args, **kwargs):
         return super().list(request, *args, **kwargs)
+
+    @action(methods=['get'], detail=False, serializer_class=TaskListSerializer, url_path="top-20-tasks")
+    def get_top_20_tasks_last_month(self, request):
+        top_tasks = Task.objects.filter(
+            owner=request.user,
+            timelogs__start_time__gte=timezone.now() - relativedelta(months=1),
+            timelogs__start_time__lte=timezone.now(),
+        ).annotate(duration=Sum('timelogs__duration')).order_by('-duration')[:20]
+        serializer = TaskListSerializer(top_tasks, many=True).data
+        return Response(serializer, status=status.HTTP_200_OK)
 
 
 class CommentViewSet(viewsets.ModelViewSet):
@@ -174,20 +184,3 @@ class TimerViewSet(viewsets.ModelViewSet):
                  start_time__lte=timezone.now(),
              ).aggregate(total=Sum('duration')).get('total')
         return Response({"Total time logged last month in minutes": total_time_logged or 0})
-
-    @action(methods=['get'], detail=False, serializer_class=None, url_path="top-20-tasks")
-    def get_top_20_tasks_last_month(self, request):
-        top_tasks = Task.objects.filter(
-                 owner=request.user,
-                 timelogs__start_time__gte=timezone.now() - relativedelta(months=1),
-                 timelogs__start_time__lte=timezone.now(),
-             ).annotate(duration=Sum('timelogs__duration')).order_by('-duration')[:20]
-        serializes_tasks = [
-                {
-                    "id": task.id,
-                    "title": task.title,
-                    "duration": task.duration or 0
-                }
-                for task in top_tasks
-            ]
-        return Response(serializes_tasks, status=status.HTTP_200_OK)
