@@ -32,6 +32,8 @@ class TaskViewSet(viewsets.ModelViewSet):
             return TaskListSerializer
         if self.action == "assign":
             return TaskAssignSerializer
+        if self.action == "time_logs_by_id":
+            return TimeLogSerializer
 
         return super().get_serializer_class()
 
@@ -54,7 +56,8 @@ class TaskViewSet(viewsets.ModelViewSet):
                 timelogs__start_time__gte=timezone.now() - relativedelta(months=1),
                 timelogs__start_time__lte=timezone.now(),
             ).annotate(total_duration=Sum('timelogs__duration')).order_by('-total_duration')[:20]
-
+        if self.action == "time_logs_by_id":
+            queryset = TimeLog.objects.filter(task=self.kwargs.get("pk"))
         return queryset
 
     @action(methods=['get'], detail=False, serializer_class=TaskListSerializer, url_path="created-tasks")
@@ -103,6 +106,10 @@ class TaskViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(top_tasks, many=True).data
         return Response(serializer, status=status.HTTP_200_OK)
 
+    @action(methods=['get'], detail=True, url_path="by-id")
+    def time_logs_by_id(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
+
 
 class CommentViewSet(viewsets.ModelViewSet):
     queryset = Comment.objects.all()
@@ -125,7 +132,7 @@ class TimerViewSet(viewsets.ModelViewSet):
     serializer_class = CreateTimeLogSerializer
 
     def get_serializer_class(self):
-        if self.action in ["add_time_log_manually", "time_logs_by_id"]:
+        if self.action == "add_time_log_manually":
             return TimeLogSerializer
         if self.action == "stop":
             return StopTimeLogSerializer
@@ -133,13 +140,12 @@ class TimerViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         queryset = super().get_queryset()
-        if self.action == "time_logs_by_id":
-            queryset = queryset.filter(task=self.kwargs.get("pk"))
         if self.action == "get_time_logged_last_month":
             queryset = TimeLog.objects.filter(
                 task__owner=self.request.user,
                 start_time__gte=timezone.now() - relativedelta(months=1),
                 start_time__lte=timezone.now(),
+                user=self.request.user,
             ).aggregate(total=Sum('duration')).get('total')
 
         return queryset
@@ -148,27 +154,23 @@ class TimerViewSet(viewsets.ModelViewSet):
         task = serializer.validated_data['task']
         task.status = Task.Status.IN_PROGRESS
         task.save()
-        serializer.save()
-
-    @action(methods=['get'], detail=True, url_path="by-id")
-    def time_logs_by_id(self, request, *args, **kwargs):
-        return super().list(request, *args, **kwargs)
+        serializer.save(user=self.request.user)
 
     @action(methods=['post'], detail=False, url_path="stop")
     def stop(self, request):
         serializer = self.get_serializer(data=self.request.data)
         serializer.is_valid(raise_exception=True)
         serializer.save()
-        return Response({"Timer was stopped successfully"})
+        return Response({"detail": "Timer was stopped successfully"})
 
     @action(methods=['post'], detail=False, url_path="manually")
     def add_time_log_manually(self, request):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        serializer.save()
+        serializer.save(user=self.request.user)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     @action(methods=['get'], detail=False, serializer_class=None, url_path="time-logged-last-month")
     def get_time_logged_last_month(self, request):
         total_time_logged = self.get_queryset()
-        return Response({"Total time logged last month in minutes": total_time_logged or 0})
+        return Response({"total_time_logged": total_time_logged or 0})
