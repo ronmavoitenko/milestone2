@@ -27,3 +27,4 @@ class TimeLog(models.Model):
     start_time = models.DateTimeField(default=timezone.now)
     end_time = models.DateTimeField(null=True, blank=True)
     duration = models.PositiveIntegerField(default=0)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='user_timelog')
