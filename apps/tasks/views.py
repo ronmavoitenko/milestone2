@@ -106,7 +106,7 @@ class TaskViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(top_tasks, many=True).data
         return Response(serializer, status=status.HTTP_200_OK)
 
-    @action(methods=['get'], detail=True, url_path="by-id")
+    @action(methods=['get'], detail=True, url_path="time_logs_by-id")
     def time_logs_by_id(self, request, *args, **kwargs):
         return super().list(request, *args, **kwargs)
 
