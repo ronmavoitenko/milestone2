@@ -55,11 +55,13 @@ INSTALLED_APPS = [
 ]
 
 REST_FRAMEWORK = {
-    # ...
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
-    'DEFAULT_FILTER_BACKENDS': ['django_filters.rest_framework.DjangoFilterBackend']
+    'DEFAULT_FILTER_BACKENDS': ['django_filters.rest_framework.DjangoFilterBackend'],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
 }
 
 SWAGGER_SETTINGS = {
@@ -90,7 +92,7 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-ROOT_URLCONF = 'milestone2.urls'
+ROOT_URLCONF = 'config.urls'
 
 AUTHENTICATION_BACKENDS = (
     "django.contrib.auth.backends.ModelBackend",
