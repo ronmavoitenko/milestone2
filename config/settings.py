@@ -163,17 +163,17 @@ TIME_ZONE = 'UTC'
 
 USE_I18N = True
 
-USE_L10N = True   # pragma: no cover
+USE_L10N = True
 
-USE_TZ = True   # pragma: no cover
+USE_TZ = True
 
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/3.2/howto/static-files/
 
-STATIC_URL = '/static/'   # pragma: no cover
+STATIC_URL = '/static/'
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/3.2/ref/settings/#default-auto-field
 
-DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'  # pragma: no cover
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
