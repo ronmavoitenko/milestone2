@@ -17,4 +17,6 @@ schema_view = get_schema_view(
 
 def send_notification(recipients, subject, message):
     from_email = settings.EMAIL_HOST_USER
+    if not isinstance(recipients, (list, tuple)):
+        recipients = [recipients]
     send_mail(subject, message, from_email, recipients, fail_silently=True)

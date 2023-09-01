@@ -15,7 +15,7 @@ class TaskListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Task
-        exclude = ("user", "status", "owner")
+        fields = ("id", "title", "description", "total_duration")
 
 
 class TaskAssignSerializer(serializers.Serializer):

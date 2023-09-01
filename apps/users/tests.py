@@ -1,8 +1,8 @@
 from django.test import TestCase, RequestFactory
 from django.contrib.auth.models import User
 from apps.users.views import UserViewSet
-from apps.users.serializers import UserSerializer
 from django.db.utils import IntegrityError
+from apps.users.serializers import UserListSerializer
 
 
 class UserViewSetTestCase(TestCase):
@@ -10,7 +10,13 @@ class UserViewSetTestCase(TestCase):
         self.factory = RequestFactory()
         self.view = UserViewSet.as_view({'post': 'create'})
 
-    def test_create_user(self):
+    def test_get_serializer_class_create(self):
+        view = UserViewSet()
+        view.action = 'list'
+        serializer_class = view.get_serializer_class()
+        self.assertEqual(serializer_class, view.serializer_class)
+
+    def test_get_full_name(self):
         data = {
             'first_name': 'Roman',
             'last_name': 'Voitenco',
@@ -21,12 +27,9 @@ class UserViewSetTestCase(TestCase):
         response = self.view(request)
         self.assertEqual(response.status_code, 201)
         user = User.objects.get(email=data['email'])
-        self.assertEqual(user.email, data['email'])
-
-    # def test_get_serializer_class_create(self):
-    #     self.view.action = 'create'
-    #     serializer_class = self.view.get_serializer_class()
-    #     self.assertEqual(serializer_class, UserSerializer)
+        serializer = UserListSerializer()
+        full_name = serializer.get_full_name(user)
+        self.assertEqual(full_name, "Roman Voitenco")
 
     def test_create_user_invalid_data(self):
         data = {
