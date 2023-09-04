@@ -10,6 +10,7 @@ from rest_framework.test import APIClient
 from rest_framework.reverse import reverse
 from rest_framework import status
 from rest_framework.exceptions import ValidationError
+from django.core.cache import cache
 
 from apps.tasks.serializers import ShortTaskSerializer, AllCommentSerializer, TaskListSerializer, TaskAssignSerializer, \
     TimeLogSerializer, CreateCommentSerializer, StopTimeLogSerializer, CreateTimeLogSerializer
@@ -130,6 +131,8 @@ class TaskViewSetTestCase(APITestCase):
 
     def test_get_top_20_tasks_last_month(self):
         current_month = timezone.now().month
+        cache_data = cache.get("get_top_20")
+        self.assertIsNone(cache_data)
         for i in range(21):
             start_time = timezone.now() - relativedelta(days=i)
             if start_time.month == current_month:
@@ -149,6 +152,12 @@ class TaskViewSetTestCase(APITestCase):
         url = reverse('task-top')
         self.client.force_authenticate(user=self.user)
         response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        url = reverse('task-top')
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get(url)
+        cache_data = cache.get("get_top")
+        self.assertIsNotNone(cache_data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_get_serializer_class_commentviewset(self):
