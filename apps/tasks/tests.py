@@ -62,13 +62,13 @@ class TaskViewSetTestCase(APITestCase):
         view.action = 'list'
         serializer_class = view.get_serializer_class()
         self.assertEqual(serializer_class, TaskListSerializer)
-        view.action = 'get_top_20_tasks_last_month'
+        view.action = 'top'
         serializer_class = view.get_serializer_class()
         self.assertEqual(serializer_class, TaskListSerializer)
         view.action = 'assign'
         serializer_class = view.get_serializer_class()
         self.assertEqual(serializer_class, TaskAssignSerializer)
-        view.action = 'time_logs_by_id'
+        view.action = 'time_logs'
         serializer_class = view.get_serializer_class()
         self.assertEqual(serializer_class, TimeLogSerializer)
         view.action = 'create'
@@ -106,7 +106,7 @@ class TaskViewSetTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_time_logs_by_id_tasks(self):
-        url = reverse('task-time-logs-by-id', args=[self.task.pk])
+        url = reverse('task-time-logs', args=[self.task.pk])
         self.client.force_authenticate(user=self.user)
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -146,7 +146,7 @@ class TaskViewSetTestCase(APITestCase):
                 end_time=start_time + relativedelta(hours=1),
                 user=self.user
             )
-        url = reverse('task-get-top-20-tasks-last-month')
+        url = reverse('task-top')
         self.client.force_authenticate(user=self.user)
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)

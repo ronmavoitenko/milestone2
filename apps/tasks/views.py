@@ -17,21 +17,22 @@ from apps.tasks.serializers import TaskSerializer, TaskListSerializer, ShortTask
 
 
 class TaskViewSet(viewsets.ModelViewSet):
-    queryset = Task.objects.all().order_by('id')
+    queryset = Task.objects.all()
     serializer_class = TaskSerializer
     filter_backends = [filters.SearchFilter]
     search_fields = ["title"]
+    ordering = ('id')
 
     def get_serializer_class(self):
         if self.action == "retrieve":
             return ShortTaskSerializer
         if self.action == "comments":
             return AllCommentSerializer
-        if self.action in ["list", "get_top_20_tasks_last_month", "my", "created", "completed"]:
+        if self.action in ["list", "top", "my", "created", "completed"]:
             return TaskListSerializer
         if self.action == "assign":
             return TaskAssignSerializer
-        if self.action == "time_logs_by_id":
+        if self.action == "time_logs":
             return TimeLogSerializer
         return super().get_serializer_class()
 
@@ -51,15 +52,15 @@ class TaskViewSet(viewsets.ModelViewSet):
         if self.action == "list":
             queryset = queryset.annotate(total_duration=Subquery(TimeLog.objects.filter(task=OuterRef('id')).values(
                 'task').annotate(total=Sum('duration')).values('total')))
-        if self.action == "get_top_20_tasks_last_month":
+        if self.action == "top":
             queryset = Task.objects.filter(
                 owner=self.request.user,
                 timelogs__start_time__gte=timezone.now() - relativedelta(months=1),
                 timelogs__start_time__lte=timezone.now(),
             ).annotate(total_duration=Sum('timelogs__duration'))
-        if self.action == "time_logs_by_id":
+        if self.action == "time_logs":
             queryset = queryset.filter(task=self.kwargs.get("pk"))
-        return queryset.order_by('id')
+        return queryset
 
     @action(methods=['get'], detail=False, serializer_class=TaskListSerializer, url_path="created-tasks")
     def created(self, request, *args, **kwargs):
@@ -101,12 +102,12 @@ class TaskViewSet(viewsets.ModelViewSet):
     def comments(self, request, *args, **kwargs):
         return super().list(request, *args, **kwargs)
 
-    @action(methods=['get'], detail=True, url_path="time_logs_by_id", queryset=TimeLog.objects.all())
-    def time_logs_by_id(self, request, *args, **kwargs):
+    @action(methods=['get'], detail=True, url_path="time_logs", queryset=TimeLog.objects.all())
+    def time_logs(self, request, *args, **kwargs):
         return super().list(request, *args, **kwargs)
 
-    @action(methods=['get'], detail=False, url_path="top-20-tasks")
-    def get_top_20_tasks_last_month(self, request):
+    @action(methods=['get'], detail=False, url_path="top")
+    def top(self, request):
         top_tasks = self.get_queryset().order_by("-total_duration")[:20]
         serializer = self.get_serializer(top_tasks, many=True).data
         return Response(serializer, status=status.HTTP_200_OK)
