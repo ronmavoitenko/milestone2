@@ -7,6 +7,7 @@ from rest_framework import filters
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from django.core.cache import cache
 
 
 from apps.common.helpers import send_notification
@@ -53,7 +54,7 @@ class TaskViewSet(viewsets.ModelViewSet):
             queryset = queryset.annotate(total_duration=Subquery(TimeLog.objects.filter(task=OuterRef('id')).values(
                 'task').annotate(total=Sum('duration')).values('total')))
         if self.action == "top":
-            queryset = Task.objects.filter(
+            queryset = queryset.filter(
                 owner=self.request.user,
                 timelogs__start_time__gte=timezone.now() - relativedelta(months=1),
                 timelogs__start_time__lte=timezone.now(),
@@ -108,8 +109,12 @@ class TaskViewSet(viewsets.ModelViewSet):
 
     @action(methods=['get'], detail=False, url_path="top")
     def top(self, request):
+        cache_data = cache.get("get_top")
+        if cache_data is not None:
+            return Response(cache_data, status=status.HTTP_200_OK)
         top_tasks = self.get_queryset().order_by("-total_duration")[:20]
         serializer = self.get_serializer(top_tasks, many=True).data
+        cache.set("get_top", serializer, 60)
         return Response(serializer, status=status.HTTP_200_OK)
 
 
