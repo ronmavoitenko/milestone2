@@ -109,12 +109,12 @@ class TaskViewSet(viewsets.ModelViewSet):
 
     @action(methods=['get'], detail=False, url_path="top")
     def top(self, request):
-        cache_data = cache.get("get_top")
+        cache_data = cache.get("top_tasks")
         if cache_data is not None:
             return Response(cache_data, status=status.HTTP_200_OK)
         top_tasks = self.get_queryset().order_by("-total_duration")[:20]
         serializer = self.get_serializer(top_tasks, many=True).data
-        cache.set("get_top", serializer, 60)
+        cache.set("top_tasks", serializer, 60)
         return Response(serializer, status=status.HTTP_200_OK)
 
 
