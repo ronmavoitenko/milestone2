@@ -13,7 +13,7 @@ services:
   pghero:
     image: ankane/pghero
     environment:
-     DATABASE_URL: postgresql://admin:1@db:5432/mydb
+     DATABASE_URL: postgresql://admin:1@milestone3-db-1:5432/mydb
     ports:
       - "8080:8080"
 
