@@ -52,6 +52,7 @@ INSTALLED_APPS = [
     'apps.tasks',
     'apps.users',
     'django_filters',
+    'django_extensions',
 ]
 
 REST_FRAMEWORK = {
@@ -62,6 +63,8 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
     ],
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 100
 }
 
 SWAGGER_SETTINGS = {
@@ -126,11 +129,21 @@ DATABASES = {
         'NAME': 'mydb',
         'USER': 'admin',
         'PASSWORD': '1',
-        'HOST': 'localhost',
+        'HOST': 'milestone3-db-1',
         'PORT': '5432',
     }
 }
 
+CACHES = {
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": "redis://redis:6379",
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+        }
+    }
+}
+CACHE_TTL = 60
 
 # Password validation
 # https://docs.djangoproject.com/en/3.2/ref/settings/#auth-password-validators
@@ -160,17 +173,17 @@ TIME_ZONE = 'UTC'
 
 USE_I18N = True
 
-USE_L10N = True   # pragma: no cover
+USE_L10N = True
 
-USE_TZ = True   # pragma: no cover
+USE_TZ = True
 
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/3.2/howto/static-files/
 
-STATIC_URL = '/static/'   # pragma: no cover
+STATIC_URL = '/static/'
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/3.2/ref/settings/#default-auto-field
 
-DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'  # pragma: no cover
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

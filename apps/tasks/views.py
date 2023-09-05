@@ -7,6 +7,8 @@ from rest_framework import filters
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from django.core.cache import cache
+
 
 from apps.common.helpers import send_notification
 from apps.tasks.models import Task, Comment, TimeLog
@@ -20,44 +22,45 @@ class TaskViewSet(viewsets.ModelViewSet):
     serializer_class = TaskSerializer
     filter_backends = [filters.SearchFilter]
     search_fields = ["title"]
+    ordering = ('id')
 
     def get_serializer_class(self):
         if self.action == "retrieve":
             return ShortTaskSerializer
-        if self.action == "create":
-            return TaskSerializer
         if self.action == "comments":
             return AllCommentSerializer
-        if self.action in ["list", "get_top_20_tasks_last_month"]:
+        if self.action in ["list", "top", "my", "created", "completed"]:
             return TaskListSerializer
         if self.action == "assign":
             return TaskAssignSerializer
-        if self.action == "time_logs_by_id":
+        if self.action == "time_logs":
             return TimeLogSerializer
-
         return super().get_serializer_class()
 
     def get_queryset(self):
         queryset = super().get_queryset()
         if self.action == "created":
-            queryset = queryset.filter(user=self.request.user)
+            queryset = queryset.annotate(total_duration=Subquery(TimeLog.objects.filter(task=OuterRef('id')).values(
+                'task').annotate(total=Sum('duration')).values('total'))).filter(user=self.request.user)
         if self.action == "my":
-            queryset = queryset.filter(owner=self.request.user)
+            queryset = queryset.annotate(total_duration=Subquery(TimeLog.objects.filter(task=OuterRef('id')).values(
+                'task').annotate(total=Sum('duration')).values('total'))).filter(owner=self.request.user)
         if self.action == "completed":
-            queryset = queryset.filter(status=Task.Status.DONE)
+            queryset = queryset.annotate(total_duration=Subquery(TimeLog.objects.filter(task=OuterRef('id')).values(
+                'task').annotate(total=Sum('duration')).values('total'))).filter(status=Task.Status.DONE)
         if self.action == "comments":
             queryset = queryset.filter(task=self.kwargs.get("pk"))
         if self.action == "list":
             queryset = queryset.annotate(total_duration=Subquery(TimeLog.objects.filter(task=OuterRef('id')).values(
                 'task').annotate(total=Sum('duration')).values('total')))
-        if self.action == "get_top_20_tasks_last_month":
-            queryset = Task.objects.filter(
+        if self.action == "top":
+            queryset = queryset.filter(
                 owner=self.request.user,
                 timelogs__start_time__gte=timezone.now() - relativedelta(months=1),
                 timelogs__start_time__lte=timezone.now(),
-            ).annotate(total_duration=Sum('timelogs__duration')).order_by('-total_duration')[:20]
-        if self.action == "time_logs_by_id":
-            queryset = TimeLog.objects.filter(task=self.kwargs.get("pk"))
+            ).annotate(total_duration=Sum('timelogs__duration'))
+        if self.action == "time_logs":
+            queryset = queryset.filter(task=self.kwargs.get("pk"))
         return queryset
 
     @action(methods=['get'], detail=False, serializer_class=TaskListSerializer, url_path="created-tasks")
@@ -100,15 +103,18 @@ class TaskViewSet(viewsets.ModelViewSet):
     def comments(self, request, *args, **kwargs):
         return super().list(request, *args, **kwargs)
 
-    @action(methods=['get'], detail=False, url_path="top-20-tasks")
-    def get_top_20_tasks_last_month(self, request):
-        top_tasks = self.get_queryset()
-        serializer = self.get_serializer(top_tasks, many=True).data
-        return Response(serializer, status=status.HTTP_200_OK)
-
-    @action(methods=['get'], detail=True, url_path="by-id")
-    def time_logs_by_id(self, request, *args, **kwargs):
+    @action(methods=['get'], detail=True, url_path="time_logs", queryset=TimeLog.objects.all())
+    def time_logs(self, request, *args, **kwargs):
         return super().list(request, *args, **kwargs)
+
+    @action(methods=['get'], detail=False, url_path="top")
+    def top(self, request):
+        if cache_data := cache.get("top_tasks"):
+            return Response(cache_data, status=status.HTTP_200_OK)
+        top_tasks = self.get_queryset().order_by("-total_duration")[:20]
+        serializer = self.get_serializer(top_tasks, many=True).data
+        cache.set("top_tasks", serializer, 60)
+        return Response(serializer, status=status.HTTP_200_OK)
 
 
 class CommentViewSet(viewsets.ModelViewSet):

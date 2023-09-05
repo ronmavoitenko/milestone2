@@ -1,0 +1,34 @@
+version: '3'
+
+services:
+  db:
+    image: postgres
+    environment:
+      POSTGRES_DB: mydb
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: 1
+    ports:
+      - "5432:5432"
+
+  pghero:
+    image: ankane/pghero
+    environment:
+     DATABASE_URL: postgresql://admin:1@milestone3-db-1:5432/mydb
+    ports:
+      - "8080:8080"
+
+
+  web:
+    build: .
+    container_name: django
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+
+
+  redis:
+      image: redis:latest
+      container_name: redis
+      ports:
+        - "6379:6379"
